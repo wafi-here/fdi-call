@@ -368,82 +368,7 @@
         <div id="fullShalatGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-3.5"></div>
       </div>
     </div>
-
-    <!-- TAB 4: TELEGRAM -->
-    <div id="tab-telegram" class="tab-panel hidden space-y-5">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        <div class="apple-card p-6 lg:col-span-7 space-y-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <h2 class="text-lg font-semibold text-[#1d1d1f]">Telegram Weather Guard</h2>
-              <p class="text-xs text-[#86868b]">Automatically warns you to prepare when rain or thunder is forecast</p>
-            </div>
-            <a href="https://t.me/fdicallbot" target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-[#007AFF] hover:underline">Open @fdicallbot ↗</a>
-          </div>
-
-          <div class="p-3.5 rounded-2xl bg-[#f5f5f7] text-xs text-[#1d1d1f] space-y-1">
-            <p class="font-semibold">Quick Setup</p>
-            <p class="text-[#86868b]">1. Send <code class="text-[#1d1d1f] font-medium">/start</code> to <a href="https://t.me/fdicallbot" target="_blank" rel="noopener noreferrer" class="text-[#007AFF] underline">t.me/fdicallbot</a> in Telegram.</p>
-            <p class="text-[#86868b]">2. Click <strong class="text-[#1d1d1f]">Auto-Detect Chat ID</strong> below.</p>
-          </div>
-
-          <div class="space-y-3">
-            <div>
-              <label for="tgBotToken" class="block text-xs font-medium text-[#86868b] mb-1">Bot API Token</label>
-              <div class="flex gap-2">
-                <input id="tgBotToken" type="password" value="" class="flex-1 apple-input px-3 py-2 text-sm font-mono outline-none" />
-                <button id="btnToggleToken" class="px-3.5 py-2 rounded-xl bg-[#f2f2f7] text-xs font-medium text-[#1d1d1f] hover:bg-[#e5e5ea]">Show</button>
-              </div>
-            </div>
-
-            <div>
-              <label for="tgChatId" class="block text-xs font-medium text-[#86868b] mb-1">Chat ID</label>
-              <div class="flex flex-col sm:flex-row gap-2">
-                <input id="tgChatId" type="text" placeholder="e.g. 123456789" class="flex-1 apple-input px-3 py-2 text-sm font-mono outline-none" />
-                <button id="btnDetectChatId" class="px-4 py-2 rounded-xl bg-[#1d1d1f] text-white text-xs font-medium hover:opacity-90 transition">Auto-Detect Chat ID</button>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label for="tgDeliveryMode" class="block text-xs font-medium text-[#86868b] mb-1">Delivery Mode</label>
-                <select id="tgDeliveryMode" class="w-full apple-input px-3 py-2 text-sm outline-none">
-                  <option value="direct">Direct Browser → Telegram</option>
-                  <option value="netlify">Netlify Function</option>
-                  <option value="vercel">Vercel Serverless</option>
-                </select>
-              </div>
-              <div>
-                <label for="tgAutoInterval" class="block text-xs font-medium text-[#86868b] mb-1">Auto-Check Interval</label>
-                <select id="tgAutoInterval" class="w-full apple-input px-3 py-2 text-sm outline-none">
-                  <option value="0">Manual Only</option>
-                  <option value="15">Every 15 Minutes</option>
-                  <option value="30">Every 30 Minutes</option>
-                  <option value="60">Every 60 Minutes</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div class="flex flex-wrap gap-2.5 pt-2">
-            <button id="btnCheckAndNotify" class="px-4 py-2.5 rounded-xl bg-[#007AFF] text-white text-xs font-medium hover:opacity-90 transition">Check &amp; Notify If Bad</button>
-            <button id="btnSimulateBadWeather" class="px-4 py-2.5 rounded-xl bg-[#ff3b30] text-white text-xs font-medium hover:opacity-90 transition">Send Test Rain Alert</button>
-          </div>
-        </div>
-
-        <div class="apple-card p-6 lg:col-span-5 flex flex-col justify-between space-y-4">
-          <div>
-            <h3 class="text-base font-semibold text-[#1d1d1f] mb-1">Message Preview</h3>
-            <p class="text-xs text-[#86868b] mb-3">Sent when rain or thunder is detected</p>
-            <pre id="tgMessagePreview" class="p-4 rounded-2xl bg-[#1d1d1f] text-white/90 text-xs whitespace-pre-wrap font-mono leading-relaxed"></pre>
-          </div>
-          <div>
-            <h3 class="text-sm font-semibold text-[#1d1d1f] mb-2">Recent Alerts</h3>
-            <div id="alertLogFull" class="space-y-2 max-h-44 overflow-y-auto custom-scroll text-xs"></div>
-          </div>
-        </div>
-      </div>
-    </div>
+   
 
   </main>
 
@@ -1155,6 +1080,69 @@
       if (badCount === 0) showToast('All saved locations have fair weather.', 'success');
     }
 
+    async function notifyAllStartUsers() {
+      const token = document.getElementById('tgBotToken').value.trim();
+      if (!token) { showToast('Enter Bot Token first.', 'warn'); return; }
+      showToast('Fetching /start users...', 'info');
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates`);
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.description || 'Could not read updates (disable webhook first if active)');
+        const chatIds = [...new Set((data.result || []).map(u => u.message?.chat?.id || u.my_chat_member?.chat?.id).filter(Boolean))];
+        if (!chatIds.length) { showToast('No /start users found yet.', 'warn'); return; }
+        const msg = buildTelegramMessage(state.location, state.weather, state.shalat, false);
+        let sent = 0;
+        for (const id of chatIds) {
+          const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: id, text: msg })
+          });
+          const j = await r.json();
+          if (j.ok) sent++;
+        }
+        addAlertLog({ ok: sent > 0, location: state.location.name, summary: `Notified ${sent}/${chatIds.length} /start user(s)` });
+        showToast(`Sent alert to ${sent} /start user(s)!`, 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function setTelegramWebhook() {
+      const token = document.getElementById('tgBotToken').value.trim();
+      const url = document.getElementById('tgWebhookUrl').value.trim();
+      if (!token || !url) { showToast('Enter your deployed webhook URL first.', 'warn'); return; }
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.description || 'setWebhook failed');
+        document.getElementById('webhookStatusBadge').textContent = 'Active';
+        document.getElementById('webhookStatusBadge').className = 'text-[11px] font-medium text-[#34c759]';
+        showToast('Webhook activated! /start now replies automatically.', 'success');
+      } catch (err) {
+        showToast(`Webhook error: ${err.message}`, 'error');
+      }
+    }
+
+    async function deleteTelegramWebhook() {
+      const token = document.getElementById('tgBotToken').value.trim();
+      if (!token) return;
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${token}/deleteWebhook`);
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.description || 'deleteWebhook failed');
+        document.getElementById('webhookStatusBadge').textContent = 'Disabled (Polling mode)';
+        document.getElementById('webhookStatusBadge').className = 'text-[11px] font-medium text-[#86868b]';
+        showToast('Webhook disabled. Auto-Detect Chat ID is active.', 'info');
+      } catch (err) {
+        showToast(`Error: ${err.message}`, 'error');
+      }
+    }
+
     function init() {
       state.watchlist = loadStorage('np_watchlist', [PRESET_LOCATIONS[0], PRESET_LOCATIONS[1]]);
       state.alertLog = loadStorage('np_alert_log', []);
@@ -1227,6 +1215,14 @@
       document.getElementById('btnDetectChatId').addEventListener('click', detectTelegramChatId);
       document.getElementById('btnCheckAndNotify').addEventListener('click', () => checkAndNotifyCurrent(false));
       document.getElementById('btnSimulateBadWeather').addEventListener('click', () => checkAndNotifyCurrent(true));
+      document.getElementById('btnNotifyAllStartUsers').addEventListener('click', notifyAllStartUsers);
+      document.getElementById('btnSetWebhook').addEventListener('click', setTelegramWebhook);
+      document.getElementById('btnDeleteWebhook').addEventListener('click', deleteTelegramWebhook);
+      if (window.location.protocol.startsWith('http')) {
+        const isNetlify = window.location.hostname.includes('netlify');
+        const defaultPath = isNetlify ? '/.netlify/functions/telegram-webhook' : '/api/telegram-webhook';
+        document.getElementById('tgWebhookUrl').value = window.location.origin + defaultPath;
+      }
       document.getElementById('tgAutoInterval').addEventListener('change', (e) => {
         if (state.autoTimerId) clearInterval(state.autoTimerId);
         const mins = Number(e.target.value);

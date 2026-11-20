@@ -6,11 +6,10 @@ Free, zero-API-key dashboard for Indonesian city & subdistrict weather forecasts
 
 ### Option 1: Netlify
 1. Drag and drop this folder to https://app.netlify.com/drop (or connect via GitHub).
-2. (Optional, recommended for security) In Netlify **Site Settings → Environment Variables**, add `TELEGRAM_BOT_TOKEN` = .
+2. (Optional, recommended for security) In Netlify **Site Settings → Environment Variables**, add `TELEGRAM_BOT_TOKEN` = `8885248927:AAHi_wzJXzQm5yvBBoFpIiGOVUnV84hC7GI`.
 3. In the dashboard's **Telegram Bot** tab, switch Delivery Mode to **Netlify Function**.
 
 ### Option 2: Vercel
 1. Import this folder at https://vercel.com/new.
-2. Add Environment Variable `TELEGRAM_BOT_TOKEN` = .
+2. Add Environment Variable `TELEGRAM_BOT_TOKEN` = `8885248927:AAHi_wzJXzQm5yvBBoFpIiGOVUnV84hC7GI`.
 3. In the dashboard's **Telegram Bot** tab, switch Delivery Mode to **Vercel Serverless**.
-# fdi-call
