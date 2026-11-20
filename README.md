@@ -11,5 +11,5 @@ Free, zero-API-key dashboard for Indonesian city & subdistrict weather forecasts
 
 ### Option 2: Vercel
 1. Import this folder at https://vercel.com/new.
-2. Add Environment Variable `TELEGRAM_BOT_TOKEN` =.
+2. Add Environment Variable `TELEGRAM_BOT_TOKEN`, `UPSTASH_REDIS_REST_URL`,`UPSTASH_REDIS_REST_TOKEN`
 3. In the dashboard's **Telegram Bot** tab, switch Delivery Mode to **Vercel Serverless**.
