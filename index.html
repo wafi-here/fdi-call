@@ -114,8 +114,6 @@
         <button data-tab="overview" class="nav-pill-btn active">Overview</button>
         <button data-tab="weather" class="nav-pill-btn">Weather</button>
         <button data-tab="shalat" class="nav-pill-btn">Shalat</button>
-        <button data-tab="telegram" class="nav-pill-btn">Telegram</button>
-        <button data-tab="deploy" class="nav-pill-btn">Deploy</button>
       </nav>
 
       <!-- Minimal Right Actions -->
@@ -263,8 +261,8 @@
             <div class="text-xs text-[#86868b] mt-0.5">Auto Rain &amp; Storm Alert</div>
           </div>
           <div class="flex items-center justify-between text-xs pt-3 border-t border-black/5">
-            <span id="kpiChatIdState" class="font-medium text-amber-600">Setup needed</span>
-            <button data-jump="telegram" class="text-[#007AFF] font-medium hover:underline">Settings →</button>
+            <span class="font-medium text-[#34c759]">Send /start</span>
+            <a href="https://t.me/fdicallbot" target="_blank" rel="noopener noreferrer" class="text-[#007AFF] font-medium hover:underline">Open Bot ↗</a>
           </div>
         </div>
       </div>
@@ -368,7 +366,6 @@
         <div id="fullShalatGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-3.5"></div>
       </div>
     </div>
-   
 
   </main>
 
@@ -616,57 +613,76 @@
       await refreshActiveData();
     }
 
+    function buildFallbackWeather(now) {
+      const times = Array.from({ length: 24 }, (_, i) => new Date(now.getTime() + i * 3600000).toISOString().slice(0, 13) + ':00');
+      const days = Array.from({ length: 7 }, (_, i) => new Date(now.getTime() + i * 86400000).toISOString().slice(0, 10));
+      return {
+        current: { temperature_2m: 24.5, apparent_temperature: 26.2, relative_humidity_2m: 84, precipitation: 1.2, weather_code: 61, wind_speed_10m: 11.4 },
+        hourly: {
+          time: times,
+          temperature_2m: times.map((_, i) => 22 + Math.round(5 * Math.sin((i + 4) / 3.8))),
+          precipitation_probability: times.map((_, i) => (i >= 2 && i <= 7) ? 75 : 30),
+          precipitation: times.map((_, i) => (i >= 2 && i <= 7) ? 2.4 : 0.0),
+          weather_code: times.map((_, i) => (i >= 2 && i <= 7) ? 63 : 2)
+        },
+        daily: {
+          time: days,
+          weather_code: [61, 95, 3, 63, 2, 80, 1],
+          temperature_2m_max: [27, 26, 28, 27, 29, 27, 28],
+          temperature_2m_min: [19, 19, 20, 19, 20, 19, 19],
+          precipitation_probability_max: [75, 85, 25, 70, 20, 65, 15]
+        }
+      };
+    }
+
+    function buildFallbackShalat(now) {
+      return {
+        date: { readable: now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }), hijri: { day: '10', month: { en: 'Jumada al-Akhirah' }, year: '1448' } },
+        timings: { Imsak: '04:01', Fajr: '04:11', Sunrise: '05:27', Dhuhr: '11:42', Asr: '15:04', Maghrib: '17:52', Isha: '19:05' }
+      };
+    }
+
     async function refreshActiveData() {
       const { lat, lon } = state.location;
       const datePicker = document.getElementById('shalatDatePicker');
       const selectedDate = datePicker.value ? new Date(datePicker.value + 'T12:00:00') : new Date();
-      try {
-        const [weatherData, shalatData] = await Promise.all([
-          fetchWeather(lat, lon),
-          fetchShalatTimes(lat, lon, selectedDate)
-        ]);
-        state.weather = weatherData;
-        state.shalat = shalatData;
-        renderWeatherUI();
-        renderShalatUI();
-        updateTelegramPreview();
-      } catch (err) {
-        const now = new Date();
-        const times = Array.from({ length: 24 }, (_, i) => new Date(now.getTime() + i * 3600000).toISOString().slice(0, 13) + ':00');
-        const days = Array.from({ length: 7 }, (_, i) => new Date(now.getTime() + i * 86400000).toISOString().slice(0, 10));
-        state.weather = {
-          current: { temperature_2m: 24.5, apparent_temperature: 26.2, relative_humidity_2m: 84, precipitation: 1.2, weather_code: 61, wind_speed_10m: 11.4 },
-          hourly: {
-            time: times,
-            temperature_2m: times.map((_, i) => 22 + Math.round(5 * Math.sin((i + 4) / 3.8))),
-            precipitation_probability: times.map((_, i) => (i >= 2 && i <= 7) ? 75 : 30),
-            precipitation: times.map((_, i) => (i >= 2 && i <= 7) ? 2.4 : 0.0),
-            weather_code: times.map((_, i) => (i >= 2 && i <= 7) ? 63 : 2)
-          },
-          daily: {
-            time: days,
-            weather_code: [61, 95, 3, 63, 2, 80, 1],
-            temperature_2m_max: [27, 26, 28, 27, 29, 27, 28],
-            temperature_2m_min: [19, 19, 20, 19, 20, 19, 19],
-            precipitation_probability_max: [75, 85, 25, 70, 20, 65, 15]
-          }
-        };
-        state.shalat = {
-          date: { readable: now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }), hijri: { day: '10', month: { en: 'Jumada al-Akhirah' }, year: '1448' } },
-          timings: { Imsak: '04:01', Fajr: '04:11', Sunrise: '05:27', Dhuhr: '11:42', Asr: '15:04', Maghrib: '17:52', Isha: '19:05' }
-        };
-        renderWeatherUI();
-        renderShalatUI();
-        updateTelegramPreview();
+      const now = new Date();
+      const [weatherRes, shalatRes] = await Promise.allSettled([
+        fetchWeather(lat, lon),
+        fetchShalatTimes(lat, lon, selectedDate)
+      ]);
+      if (weatherRes.status === 'fulfilled') {
+        state.weather = weatherRes.value;
+      } else {
+        state.weather = buildFallbackWeather(now);
+        showToast('Weather sync failed — showing sample forecast.', 'warn');
       }
+      if (shalatRes.status === 'fulfilled') {
+        state.shalat = shalatRes.value;
+      } else {
+        state.shalat = buildFallbackShalat(now);
+        showToast('Shalat times sync failed — showing fallback schedule.', 'warn');
+      }
+      renderWeatherUI();
+      renderShalatUI();
+    }
+
+    function getHourlyStartIndex(weather) {
+      const times = weather?.hourly?.time;
+      if (!times || !times.length) return 0;
+      const curPrefix = (weather.current?.time || '').slice(0, 13);
+      if (!curPrefix) return 0;
+      const idx = times.findIndex(t => t >= curPrefix);
+      return idx >= 0 ? idx : 0;
     }
 
     function analyzeWeatherRisk(weather) {
       const cur = weather.current;
       const curWmo = getWmo(cur.weather_code);
-      const next6Probs = weather.hourly.precipitation_probability.slice(0, 6);
-      const next6Codes = weather.hourly.weather_code.slice(0, 6);
-      const next6Precip = weather.hourly.precipitation.slice(0, 6);
+      const startIdx = getHourlyStartIndex(weather);
+      const next6Probs = weather.hourly.precipitation_probability.slice(startIdx, startIdx + 6);
+      const next6Codes = weather.hourly.weather_code.slice(startIdx, startIdx + 6);
+      const next6Precip = weather.hourly.precipitation.slice(startIdx, startIdx + 6);
       const maxProb = Math.max(...next6Probs, 0);
       const maxPrecip = Math.max(...next6Precip, cur.precipitation || 0);
       const badCodeIn6h = next6Codes.find(c => getWmo(c).bad);
@@ -728,11 +744,14 @@
         dailyGrid.appendChild(card);
       });
 
+      const startIdx = getHourlyStartIndex(w);
       const tbody = document.getElementById('hourlyTableBody');
       tbody.innerHTML = '';
-      for (let i = 0; i < 24; i += 3) {
+      for (let offset = 0; offset < 24; offset += 3) {
+        const i = startIdx + offset;
+        if (i >= w.hourly.time.length) break;
         const tStr = w.hourly.time[i];
-        const hourLabel = tStr ? tStr.slice(11, 16) : `${String(i).padStart(2, '0')}:00`;
+        const hourLabel = tStr ? tStr.slice(11, 16) : `${String(offset).padStart(2, '0')}:00`;
         const wmo = getWmo(w.hourly.weather_code[i]);
         const prob = w.hourly.precipitation_probability[i];
         const precip = w.hourly.precipitation[i];
@@ -757,9 +776,10 @@
       const canvas = document.getElementById('weatherChart');
       if (!canvas || !state.weather) return;
       const w = state.weather;
-      const labels = w.hourly.time.slice(0, 24).map(t => t.slice(11, 16));
-      const temps = w.hourly.temperature_2m.slice(0, 24);
-      const probs = w.hourly.precipitation_probability.slice(0, 24);
+      const startIdx = getHourlyStartIndex(w);
+      const labels = w.hourly.time.slice(startIdx, startIdx + 24).map(t => t.slice(11, 16));
+      const temps = w.hourly.temperature_2m.slice(startIdx, startIdx + 24);
+      const probs = w.hourly.precipitation_probability.slice(startIdx, startIdx + 24);
 
       if (state.chartInstance) state.chartInstance.destroy();
       state.chartInstance = new Chart(canvas.getContext('2d'), {
@@ -862,12 +882,17 @@
       startCountdown(prayers);
     }
 
+    function parseTimeHM(timeStr) {
+      const [hh, mm] = String(timeStr || '00:00').split(':').map(v => parseInt(v, 10));
+      return [Number.isFinite(hh) ? hh : 0, Number.isFinite(mm) ? mm : 0];
+    }
+
     function findNextPrayer(prayers) {
       const now = new Date();
       const nowMins = now.getHours() * 60 + now.getMinutes();
       for (const p of prayers) {
         if (p.key === 'Imsak' || p.key === 'Sunrise') continue;
-        const [hh, mm] = p.time.split(':').map(Number);
+        const [hh, mm] = parseTimeHM(p.time);
         if (hh * 60 + mm > nowMins) return { ...p, tomorrow: false };
       }
       const subuh = prayers.find(p => p.key === 'Fajr') || prayers[0];
@@ -879,7 +904,7 @@
       const update = () => {
         const nextP = findNextPrayer(prayers);
         const now = new Date();
-        const [hh, mm] = nextP.time.split(':').map(Number);
+        const [hh, mm] = parseTimeHM(nextP.time);
         const target = new Date(now);
         target.setHours(hh, mm, 0, 0);
         if (nextP.tomorrow) target.setDate(target.getDate() + 1);
@@ -948,11 +973,6 @@
         `⚠️ Reminder: Rain/thunderstorm is expected. Bring an umbrella/raincoat and stay safe!`;
     }
 
-    function updateTelegramPreview() {
-      const previewEl = document.getElementById('tgMessagePreview');
-      if (previewEl) previewEl.textContent = buildTelegramMessage(state.location, state.weather, state.shalat, false);
-    }
-
     function addAlertLog(entry) {
       state.alertLog.unshift({ ...entry, time: new Date().toLocaleTimeString('en-GB', { hour12: false }) });
       state.alertLog = state.alertLog.slice(0, 20);
@@ -961,89 +981,41 @@
     }
 
     function renderAlertLogs() {
-      const targets = [document.getElementById('alertLogOverview'), document.getElementById('alertLogFull')];
-      targets.forEach(el => {
-        if (!el) return;
-        if (!state.alertLog.length) {
-          el.innerHTML = '<div class="text-[#86868b] p-3 rounded-xl bg-[#f5f5f7]">No Telegram alerts sent yet.</div>';
-          return;
-        }
-        el.innerHTML = state.alertLog.map(item => `
-          <div class="p-2.5 rounded-xl bg-[#f5f5f7] flex items-start justify-between gap-2">
-            <div>
-              <div class="font-medium text-[#1d1d1f]">${item.location}</div>
-              <div class="${item.ok ? 'text-[#34c759]' : 'text-[#ff3b30]'}">${item.summary}</div>
-            </div>
-            <span class="font-mono text-[10px] text-[#86868b] shrink-0">${item.time}</span>
+      const el = document.getElementById('alertLogOverview');
+      if (!el) return;
+      if (!state.alertLog.length) {
+        el.innerHTML = '<div class="text-[#86868b] p-3 rounded-xl bg-[#f5f5f7]">No Telegram alerts sent yet.</div>';
+        return;
+      }
+      el.innerHTML = state.alertLog.map(item => `
+        <div class="p-2.5 rounded-xl bg-[#f5f5f7] flex items-start justify-between gap-2">
+          <div>
+            <div class="font-medium text-[#1d1d1f]">${item.location}</div>
+            <div class="${item.ok ? 'text-[#34c759]' : 'text-[#ff3b30]'}">${item.summary}</div>
           </div>
-        `).join('');
-      });
-    }
-
-    async function detectTelegramChatId() {
-      const token = document.getElementById('tgBotToken').value.trim();
-      if (!token) { showToast('Enter Bot Token first.', 'warn'); return; }
-      showToast('Checking @fdicallbot updates...', 'info');
-      try {
-        const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates`);
-        const data = await res.json();
-        if (!data.ok) throw new Error(data.description || 'Telegram API error');
-        const updates = data.result || [];
-        const lastWithMsg = [...updates].reverse().find(u => u.message?.chat?.id || u.my_chat_member?.chat?.id);
-        if (!lastWithMsg) { showToast('Send /start to @fdicallbot in Telegram first!', 'warn'); return; }
-        const chat = lastWithMsg.message?.chat || lastWithMsg.my_chat_member?.chat;
-        document.getElementById('tgChatId').value = String(chat.id);
-        saveStorage('np_tg_chat_id', String(chat.id));
-        updateChatIdBadge();
-        showToast(`Connected Chat ID: ${chat.id}`, 'success');
-      } catch (err) {
-        showToast(`Detect failed: ${err.message}`, 'error');
-      }
-    }
-
-    function updateChatIdBadge() {
-      const chatId = document.getElementById('tgChatId').value.trim();
-      const badge = document.getElementById('kpiChatIdState');
-      if (chatId) {
-        badge.className = 'font-medium text-[#34c759]';
-        badge.textContent = `Connected (${chatId})`;
-      } else {
-        badge.className = 'font-medium text-[#ff9500]';
-        badge.textContent = 'Setup needed';
-      }
+          <span class="font-mono text-[10px] text-[#86868b] shrink-0">${item.time}</span>
+        </div>
+      `).join('');
     }
 
     async function sendTelegramMessage(text, locName) {
-      const token = document.getElementById('tgBotToken').value.trim();
-      const chatId = document.getElementById('tgChatId').value.trim();
-      const mode = document.getElementById('tgDeliveryMode').value;
-      if (!chatId) { showToast('Set or Auto-Detect Chat ID first.', 'warn'); switchTab('telegram'); return false; }
+      const isNetlify = window.location.hostname.includes('netlify');
+      const endpoint = isNetlify ? '/.netlify/functions/telegram-notify' : '/api/telegram-notify';
+      const savedChatId = loadStorage('np_tg_chat_id', '');
       try {
-        let res, data;
-        if (mode === 'direct') {
-          res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: chatId, text })
-          });
-          data = await res.json();
-          if (!data.ok) throw new Error(data.description || 'Telegram sendMessage failed');
-        } else {
-          const endpoint = mode === 'netlify' ? '/.netlify/functions/telegram-notify' : '/api/telegram-notify';
-          res = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: chatId, text })
-          });
-          data = await res.json();
-          if (!res.ok || !data.ok) throw new Error(data.error || 'Serverless function failed');
-        }
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...(savedChatId ? { chat_id: savedChatId } : {}), text })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Serverless alert not configured');
         addAlertLog({ ok: true, location: locName, summary: 'Alert delivered' });
         showToast(`Alert sent for ${locName}!`, 'success');
         return true;
       } catch (err) {
         addAlertLog({ ok: false, location: locName, summary: err.message });
-        showToast(`Telegram error: ${err.message}`, 'error');
+        showToast(`Telegram: ${err.message}`, 'error');
         return false;
       }
     }
@@ -1080,77 +1052,15 @@
       if (badCount === 0) showToast('All saved locations have fair weather.', 'success');
     }
 
-    async function notifyAllStartUsers() {
-      const token = document.getElementById('tgBotToken').value.trim();
-      if (!token) { showToast('Enter Bot Token first.', 'warn'); return; }
-      showToast('Fetching /start users...', 'info');
-      try {
-        const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates`);
-        const data = await res.json();
-        if (!data.ok) throw new Error(data.description || 'Could not read updates (disable webhook first if active)');
-        const chatIds = [...new Set((data.result || []).map(u => u.message?.chat?.id || u.my_chat_member?.chat?.id).filter(Boolean))];
-        if (!chatIds.length) { showToast('No /start users found yet.', 'warn'); return; }
-        const msg = buildTelegramMessage(state.location, state.weather, state.shalat, false);
-        let sent = 0;
-        for (const id of chatIds) {
-          const r = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: id, text: msg })
-          });
-          const j = await r.json();
-          if (j.ok) sent++;
-        }
-        addAlertLog({ ok: sent > 0, location: state.location.name, summary: `Notified ${sent}/${chatIds.length} /start user(s)` });
-        showToast(`Sent alert to ${sent} /start user(s)!`, 'success');
-      } catch (err) {
-        showToast(err.message, 'error');
-      }
-    }
-
-    async function setTelegramWebhook() {
-      const token = document.getElementById('tgBotToken').value.trim();
-      const url = document.getElementById('tgWebhookUrl').value.trim();
-      if (!token || !url) { showToast('Enter your deployed webhook URL first.', 'warn'); return; }
-      try {
-        const res = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url })
-        });
-        const data = await res.json();
-        if (!data.ok) throw new Error(data.description || 'setWebhook failed');
-        document.getElementById('webhookStatusBadge').textContent = 'Active';
-        document.getElementById('webhookStatusBadge').className = 'text-[11px] font-medium text-[#34c759]';
-        showToast('Webhook activated! /start now replies automatically.', 'success');
-      } catch (err) {
-        showToast(`Webhook error: ${err.message}`, 'error');
-      }
-    }
-
-    async function deleteTelegramWebhook() {
-      const token = document.getElementById('tgBotToken').value.trim();
-      if (!token) return;
-      try {
-        const res = await fetch(`https://api.telegram.org/bot${token}/deleteWebhook`);
-        const data = await res.json();
-        if (!data.ok) throw new Error(data.description || 'deleteWebhook failed');
-        document.getElementById('webhookStatusBadge').textContent = 'Disabled (Polling mode)';
-        document.getElementById('webhookStatusBadge').className = 'text-[11px] font-medium text-[#86868b]';
-        showToast('Webhook disabled. Auto-Detect Chat ID is active.', 'info');
-      } catch (err) {
-        showToast(`Error: ${err.message}`, 'error');
-      }
+    function getJakartaDateISO() {
+      return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
     }
 
     function init() {
       state.watchlist = loadStorage('np_watchlist', [PRESET_LOCATIONS[0], PRESET_LOCATIONS[1]]);
       state.alertLog = loadStorage('np_alert_log', []);
-      const savedChatId = loadStorage('np_tg_chat_id', '');
-      if (savedChatId) document.getElementById('tgChatId').value = savedChatId;
-      updateChatIdBadge();
 
-      document.getElementById('shalatDatePicker').value = new Date().toISOString().slice(0, 10);
+      document.getElementById('shalatDatePicker').value = getJakartaDateISO();
 
       const chipsWrap = document.getElementById('presetChips');
       PRESET_LOCATIONS.forEach(loc => {
@@ -1201,37 +1111,8 @@
 
       document.getElementById('shalatDatePicker').addEventListener('change', refreshActiveData);
       document.getElementById('btnShalatToday').addEventListener('click', () => {
-        document.getElementById('shalatDatePicker').value = new Date().toISOString().slice(0, 10);
+        document.getElementById('shalatDatePicker').value = getJakartaDateISO();
         refreshActiveData();
-      });
-
-      document.getElementById('btnToggleToken').addEventListener('click', () => {
-        const inp = document.getElementById('tgBotToken');
-        const btn = document.getElementById('btnToggleToken');
-        if (inp.type === 'password') { inp.type = 'text'; btn.textContent = 'Hide'; }
-        else { inp.type = 'password'; btn.textContent = 'Show'; }
-      });
-      document.getElementById('tgChatId').addEventListener('input', (e) => { saveStorage('np_tg_chat_id', e.target.value.trim()); updateChatIdBadge(); });
-      document.getElementById('btnDetectChatId').addEventListener('click', detectTelegramChatId);
-      document.getElementById('btnCheckAndNotify').addEventListener('click', () => checkAndNotifyCurrent(false));
-      document.getElementById('btnSimulateBadWeather').addEventListener('click', () => checkAndNotifyCurrent(true));
-      document.getElementById('btnNotifyAllStartUsers').addEventListener('click', notifyAllStartUsers);
-      document.getElementById('btnSetWebhook').addEventListener('click', setTelegramWebhook);
-      document.getElementById('btnDeleteWebhook').addEventListener('click', deleteTelegramWebhook);
-      if (window.location.protocol.startsWith('http')) {
-        const isNetlify = window.location.hostname.includes('netlify');
-        const defaultPath = isNetlify ? '/.netlify/functions/telegram-webhook' : '/api/telegram-webhook';
-        document.getElementById('tgWebhookUrl').value = window.location.origin + defaultPath;
-      }
-      document.getElementById('tgAutoInterval').addEventListener('change', (e) => {
-        if (state.autoTimerId) clearInterval(state.autoTimerId);
-        const mins = Number(e.target.value);
-        if (mins > 0) {
-          state.autoTimerId = setInterval(scanAllWatchlistAndNotify, mins * 60 * 1000);
-          showToast(`Auto-monitor: every ${mins}m`, 'success');
-        } else {
-          showToast('Auto-monitor off.', 'info');
-        }
       });
 
       renderWatchlist();
