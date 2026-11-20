@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nusantara — Weather, Shalat &amp; Telegram</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <style>
+    :root {
+      --apple-bg: #f5f5f7;
+      --apple-surface: #ffffff;
+      --apple-ink: #1d1d1f;
+      --apple-muted: #86868b;
+      --apple-blue: #007aff;
+      --apple-border: rgba(0, 0, 0, 0.06);
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Helvetica Neue", sans-serif;
+      background-color: var(--apple-bg);
+      color: var(--apple-ink);
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+    .apple-card {
+      background: var(--apple-surface);
+      border: 1px solid var(--apple-border);
+      border-radius: 20px;
+      box-shadow: 0 2px 14px rgba(0, 0, 0, 0.025);
+    }
+    .apple-nav-bar {
+      background: rgba(245, 245, 247, 0.82);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    }
+    .segmented-track {
+      background: rgba(118, 118, 128, 0.12);
+      border-radius: 9999px;
+      padding: 3px;
+    }
+    .nav-pill-btn {
+      padding: 6px 15px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      color: #636366;
+      transition: all 0.18s cubic-bezier(0.25, 0.8, 0.25, 1);
+      white-space: nowrap;
+    }
+    .nav-pill-btn.active {
+      background: #ffffff;
+      color: #1d1d1f;
+      font-weight: 600;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.04);
+    }
+    .nav-pill-btn:not(.active):hover {
+      color: #1d1d1f;
+    }
+    .apple-icon-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 9999px;
+      background: #ffffff;
+      border: 1px solid var(--apple-border);
+      color: #1d1d1f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s ease, transform 0.15s ease;
+    }
+    .apple-icon-btn:hover {
+      background: #ececef;
+    }
+    .apple-icon-btn:active {
+      transform: scale(0.96);
+    }
+    .apple-input {
+      background: #f2f2f7;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      transition: all 0.15s ease;
+    }
+    .apple-input:focus-within, .apple-input:focus {
+      background: #ffffff;
+      border-color: rgba(0, 122, 255, 0.45);
+      box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
+    }
+    .custom-scroll::-webkit-scrollbar { height: 5px; width: 5px; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.15); border-radius: 9999px; }
+  </style>
+</head>
+<body class="selection:bg-[#007AFF] selection:text-white">
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+  <!-- Sticky Translucent Apple Top Bar -->
+  <header class="apple-nav-bar sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5 shrink-0">
+        <div class="w-8 h-8 rounded-xl bg-[#007AFF] text-white flex items-center justify-center shadow-sm">
+          <i data-lucide="cloud-sun" class="w-4 h-4"></i>
+        </div>
+        <span class="font-semibold text-[15px] tracking-tight text-[#1d1d1f]">Nusantara</span>
+      </div>
+
+      <!-- Apple Segmented Control -->
+      <nav aria-label="Primary" class="segmented-track flex items-center gap-0.5 overflow-x-auto custom-scroll max-w-full">
+        <button data-tab="overview" class="nav-pill-btn active">Overview</button>
+        <button data-tab="weather" class="nav-pill-btn">Weather</button>
+        <button data-tab="shalat" class="nav-pill-btn">Shalat</button>
+        <button data-tab="telegram" class="nav-pill-btn">Telegram</button>
+        <button data-tab="deploy" class="nav-pill-btn">Deploy</button>
+      </nav>
+
+      <!-- Minimal Right Actions -->
+      <div class="flex items-center gap-2 shrink-0">
+        <button id="btnRefreshAll" title="Refresh data" class="apple-icon-btn" aria-label="Refresh data">
+          <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+        </button>
+        <button id="btnQuickSaveLocation" title="Save location" class="apple-icon-btn" aria-label="Save location">
+          <i data-lucide="bookmark" class="w-3.5 h-3.5"></i>
+        </button>
+        <button id="btnHeaderTestAlert" title="Send test Telegram alert" class="apple-icon-btn relative" aria-label="Send test alert">
+          <i data-lucide="send" class="w-3.5 h-3.5"></i>
+          <span id="headerAlertBadge" class="hidden absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#ff3b30] border-2 border-white"></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+
+    <!-- Clean Apple Location Header & Search -->
+    <section class="flex flex-col gap-4">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <h1 id="activeLocationTitle" class="text-2xl sm:text-3xl font-bold tracking-tight text-[#1d1d1f]">Coblong, Kota Bandung</h1>
+            <span id="weatherAlertPill" class="text-xs font-medium px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700">Clear</span>
+          </div>
+          <p id="activeLocationSubtitle" class="text-xs sm:text-sm text-[#86868b] mt-0.5">
+            Jawa Barat • <span id="activeCoordsBadge">-6.8879, 107.6152</span>
+          </p>
+        </div>
+
+        <!-- Unified Search + Region Drawer Toggle -->
+        <div class="flex items-center gap-2 w-full md:w-auto">
+          <div class="relative flex-1 md:w-72">
+            <div class="apple-input flex items-center px-3 py-2">
+              <i data-lucide="search" class="w-4 h-4 text-[#86868b] mr-2 shrink-0"></i>
+              <input id="searchCityInput" type="text" placeholder="Search city or subdistrict..." class="w-full text-sm bg-transparent outline-none text-[#1d1d1f] placeholder:text-[#86868b]" />
+              <button id="btnSearchCity" class="text-xs font-semibold text-[#007AFF] hover:opacity-80 pl-2 shrink-0">Search</button>
+            </div>
+            <div id="searchResultsDropdown" class="hidden absolute left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-black/5 z-30 max-h-64 overflow-y-auto custom-scroll p-1.5"></div>
+          </div>
+          <button id="btnToggleWilayah" class="px-3.5 py-2 rounded-xl bg-white border border-black/5 text-xs font-medium text-[#1d1d1f] hover:bg-[#ececef] transition shrink-0 flex items-center gap-1.5">
+            <i data-lucide="map" class="w-3.5 h-3.5 text-[#007AFF]"></i>
+            <span class="hidden sm:inline">Regions</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Collapsible Cascading Wilayah Picker (Keeps default view super clean) -->
+      <div id="wilayahDrawer" class="hidden apple-card p-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div>
+            <label for="selectProvince" class="block text-[11px] font-medium text-[#86868b] mb-1">Province</label>
+            <select id="selectProvince" class="w-full apple-input px-3 py-2 text-sm text-[#1d1d1f] outline-none">
+              <option value="">Loading provinces...</option>
+            </select>
+          </div>
+          <div>
+            <label for="selectRegency" class="block text-[11px] font-medium text-[#86868b] mb-1">City / Regency</label>
+            <select id="selectRegency" class="w-full apple-input px-3 py-2 text-sm text-[#1d1d1f] outline-none" disabled>
+              <option value="">Select province first</option>
+            </select>
+          </div>
+          <div>
+            <label for="selectDistrict" class="block text-[11px] font-medium text-[#86868b] mb-1">Subdistrict (Kecamatan)</label>
+            <select id="selectDistrict" class="w-full apple-input px-3 py-2 text-sm text-[#1d1d1f] outline-none" disabled>
+              <option value="">Select city first</option>
+            </select>
+          </div>
+          <div class="flex items-end">
+            <button id="btnApplyWilayah" class="w-full rounded-xl bg-[#007AFF] text-white text-sm font-medium py-2 px-4 hover:opacity-90 transition flex items-center justify-center gap-1.5 disabled:opacity-40" disabled>
+              <span>Load Subdistrict</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Minimal Preset Strip -->
+      <div id="presetChips" class="flex items-center gap-1.5 overflow-x-auto custom-scroll pb-1"></div>
+    </section>
+
+    <!-- TAB 1: OVERVIEW -->
+    <div id="tab-overview" class="tab-panel space-y-5">
+
+      <!-- Clean 4-Card Apple Summary Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Weather Hero -->
+        <div class="apple-card p-5 flex flex-col justify-between">
+          <div class="flex items-center justify-between text-xs font-medium text-[#86868b]">
+            <span>Weather</span>
+            <i data-lucide="thermometer" class="w-4 h-4 text-[#007AFF]"></i>
+          </div>
+          <div class="my-3 flex items-baseline gap-2">
+            <span id="kpiTemp" class="text-4xl font-semibold tracking-tight text-[#1d1d1f]">--°</span>
+            <span id="kpiFeels" class="text-xs text-[#86868b]">Feels --°</span>
+          </div>
+          <div class="flex items-center justify-between text-xs pt-3 border-t border-black/5">
+            <span id="kpiConditionText" class="font-medium text-[#1d1d1f]">Loading...</span>
+            <span id="kpiHumidityWind" class="text-[#86868b]">--%</span>
+          </div>
+        </div>
+
+        <!-- Rain & Storm Risk -->
+        <div class="apple-card p-5 flex flex-col justify-between">
+          <div class="flex items-center justify-between text-xs font-medium text-[#86868b]">
+            <span>6h Rain Risk</span>
+            <i data-lucide="umbrella" class="w-4 h-4 text-[#007AFF]"></i>
+          </div>
+          <div class="my-3 flex items-baseline gap-2">
+            <span id="kpiRainProb" class="text-4xl font-semibold tracking-tight text-[#1d1d1f]">--%</span>
+            <span id="kpiRainMm" class="text-xs text-[#86868b]">0 mm</span>
+          </div>
+          <div class="flex items-center justify-between text-xs pt-3 border-t border-black/5">
+            <span id="kpiRiskLabel" class="font-medium text-emerald-600">Safe</span>
+            <button id="btnOverviewTriggerAlert" class="text-[#007AFF] font-medium hover:underline">Notify →</button>
+          </div>
+        </div>
+
+        <!-- Next Shalat -->
+        <div class="apple-card p-5 flex flex-col justify-between bg-[#1d1d1f] text-white border-transparent">
+          <div class="flex items-center justify-between text-xs font-medium text-white/60">
+            <span>Next Shalat</span>
+            <i data-lucide="moon" class="w-4 h-4 text-amber-300"></i>
+          </div>
+          <div class="my-3 flex items-baseline gap-2">
+            <span id="kpiNextPrayerName" class="text-3xl font-semibold tracking-tight text-white">--</span>
+            <span id="kpiNextPrayerTime" class="text-sm font-medium text-white/75">--:--</span>
+          </div>
+          <div class="flex items-center justify-between text-xs pt-3 border-t border-white/10">
+            <span id="kpiCountdown" class="font-mono font-medium text-amber-300">in --:--:--</span>
+            <span id="kpiHijriDate" class="text-white/55 truncate max-w-[120px]">--</span>
+          </div>
+        </div>
+
+        <!-- Telegram Guard -->
+        <div class="apple-card p-5 flex flex-col justify-between">
+          <div class="flex items-center justify-between text-xs font-medium text-[#86868b]">
+            <span>Telegram Bot</span>
+            <i data-lucide="send" class="w-4 h-4 text-[#007AFF]"></i>
+          </div>
+          <div class="my-3">
+            <div class="text-xl font-semibold tracking-tight text-[#1d1d1f]">@fdicallbot</div>
+            <div class="text-xs text-[#86868b] mt-0.5">Auto Rain &amp; Storm Alert</div>
+          </div>
+          <div class="flex items-center justify-between text-xs pt-3 border-t border-black/5">
+            <span id="kpiChatIdState" class="font-medium text-amber-600">Setup needed</span>
+            <button data-jump="telegram" class="text-[#007AFF] font-medium hover:underline">Settings →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Split: 24h Chart + Shalat List -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div class="apple-card p-5 lg:col-span-7">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-base font-semibold text-[#1d1d1f]">24-Hour Forecast</h2>
+              <p class="text-xs text-[#86868b]">Temperature &amp; rain probability for <span id="chartLocationLabel">Coblong, Bandung</span></p>
+            </div>
+            <span class="text-[11px] font-medium text-[#86868b]">Open-Meteo</span>
+          </div>
+          <div class="relative h-64 w-full">
+            <canvas id="weatherChart"></canvas>
+          </div>
+        </div>
+
+        <div class="apple-card p-5 lg:col-span-5">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h2 class="text-base font-semibold text-[#1d1d1f]">Shalat Times</h2>
+              <p id="shalatDateLabel" class="text-xs text-[#86868b]">Kemenag RI</p>
+            </div>
+            <button data-jump="shalat" class="text-xs font-medium text-[#007AFF] hover:underline">All</button>
+          </div>
+          <div id="overviewShalatGrid" class="divide-y divide-black/5"></div>
+        </div>
+      </div>
+
+      <!-- Watchlist & Recent Alerts -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div class="apple-card p-5 lg:col-span-7">
+          <div class="flex items-center justify-between gap-2 mb-3">
+            <div>
+              <h2 class="text-base font-semibold text-[#1d1d1f]">Saved Locations</h2>
+              <p class="text-xs text-[#86868b]">Switch cities or scan all for bad weather</p>
+            </div>
+            <button id="btnScanAllWatchlist" class="text-xs font-medium bg-[#007AFF] text-white px-3.5 py-1.5 rounded-full hover:opacity-90 transition">Scan All</button>
+          </div>
+          <div id="watchlistContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5"></div>
+        </div>
+
+        <div class="apple-card p-5 lg:col-span-5">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h2 class="text-base font-semibold text-[#1d1d1f]">Alert History</h2>
+              <p class="text-xs text-[#86868b]">Sent via @fdicallbot</p>
+            </div>
+            <button id="btnClearLog" class="text-xs text-[#86868b] hover:text-[#1d1d1f]">Clear</button>
+          </div>
+          <div id="alertLogOverview" class="space-y-2 max-h-52 overflow-y-auto custom-scroll text-xs"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: WEATHER -->
+    <div id="tab-weather" class="tab-panel hidden space-y-5">
+      <div class="apple-card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-base font-semibold text-[#1d1d1f]">7-Day Outlook</h2>
+          <span class="text-xs text-[#86868b]">Flags Rain &amp; Thunderstorms</span>
+        </div>
+        <div id="dailyForecastGrid" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3"></div>
+      </div>
+
+      <div class="apple-card p-5">
+        <h2 class="text-base font-semibold text-[#1d1d1f] mb-3">Hourly Breakdown</h2>
+        <div class="overflow-x-auto custom-scroll">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-black/5 text-xs text-[#86868b] font-medium">
+                <th class="py-2.5 pr-4">Time</th>
+                <th class="py-2.5 pr-4">Condition</th>
+                <th class="py-2.5 pr-4">Temp</th>
+                <th class="py-2.5 pr-4">Rain Prob</th>
+                <th class="py-2.5 pr-4">Precip</th>
+                <th class="py-2.5">Status</th>
+              </tr>
+            </thead>
+            <tbody id="hourlyTableBody" class="divide-y divide-black/5 text-[#1d1d1f]"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: SHALAT -->
+    <div id="tab-shalat" class="tab-panel hidden space-y-5">
+      <div class="apple-card p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-lg font-semibold text-[#1d1d1f]">Daily Shalat Schedule</h2>
+            <p class="text-xs text-[#86868b]">Kemenag RI (Method 20) for exact subdistrict coordinates</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <input id="shalatDatePicker" type="date" class="apple-input px-3 py-1.5 text-sm text-[#1d1d1f] outline-none" />
+            <button id="btnShalatToday" class="text-xs font-medium px-3.5 py-2 rounded-xl bg-[#1d1d1f] text-white hover:opacity-90">Today</button>
+          </div>
+        </div>
+        <div id="fullShalatGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-3.5"></div>
+      </div>
+    </div>
+
+    <!-- TAB 4: TELEGRAM -->
+    <div id="tab-telegram" class="tab-panel hidden space-y-5">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div class="apple-card p-6 lg:col-span-7 space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-[#1d1d1f]">Telegram Weather Guard</h2>
+              <p class="text-xs text-[#86868b]">Automatically warns you to prepare when rain or thunder is forecast</p>
+            </div>
+            <a href="https://t.me/fdicallbot" target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-[#007AFF] hover:underline">Open @fdicallbot ↗</a>
+          </div>
+
+          <div class="p-3.5 rounded-2xl bg-[#f5f5f7] text-xs text-[#1d1d1f] space-y-1">
+            <p class="font-semibold">Quick Setup</p>
+            <p class="text-[#86868b]">1. Send <code class="text-[#1d1d1f] font-medium">/start</code> to <a href="https://t.me/fdicallbot" target="_blank" rel="noopener noreferrer" class="text-[#007AFF] underline">t.me/fdicallbot</a> in Telegram.</p>
+            <p class="text-[#86868b]">2. Click <strong class="text-[#1d1d1f]">Auto-Detect Chat ID</strong> below.</p>
+          </div>
+
+          <div class="space-y-3">
+            <div>
+              <label for="tgBotToken" class="block text-xs font-medium text-[#86868b] mb-1">Bot API Token</label>
+              <div class="flex gap-2">
+                <input id="tgBotToken" type="password" value="8885248927:AAHi_wzJXzQm5yvBBoFpIiGOVUnV84hC7GI" class="flex-1 apple-input px-3 py-2 text-sm font-mono outline-none" />
+                <button id="btnToggleToken" class="px-3.5 py-2 rounded-xl bg-[#f2f2f7] text-xs font-medium text-[#1d1d1f] hover:bg-[#e5e5ea]">Show</button>
+              </div>
+            </div>
+
+            <div>
+              <label for="tgChatId" class="block text-xs font-medium text-[#86868b] mb-1">Chat ID</label>
+              <div class="flex flex-col sm:flex-row gap-2">
+                <input id="tgChatId" type="text" placeholder="e.g. 123456789" class="flex-1 apple-input px-3 py-2 text-sm font-mono outline-none" />
+                <button id="btnDetectChatId" class="px-4 py-2 rounded-xl bg-[#1d1d1f] text-white text-xs font-medium hover:opacity-90 transition">Auto-Detect Chat ID</button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label for="tgDeliveryMode" class="block text-xs font-medium text-[#86868b] mb-1">Delivery Mode</label>
+                <select id="tgDeliveryMode" class="w-full apple-input px-3 py-2 text-sm outline-none">
+                  <option value="direct">Direct Browser → Telegram</option>
+                  <option value="netlify">Netlify Function</option>
+                  <option value="vercel">Vercel Serverless</option>
+                </select>
+              </div>
+              <div>
+                <label for="tgAutoInterval" class="block text-xs font-medium text-[#86868b] mb-1">Auto-Check Interval</label>
+                <select id="tgAutoInterval" class="w-full apple-input px-3 py-2 text-sm outline-none">
+                  <option value="0">Manual Only</option>
+                  <option value="15">Every 15 Minutes</option>
+                  <option value="30">Every 30 Minutes</option>
+                  <option value="60">Every 60 Minutes</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap gap-2.5 pt-2">
+            <button id="btnCheckAndNotify" class="px-4 py-2.5 rounded-xl bg-[#007AFF] text-white text-xs font-medium hover:opacity-90 transition">Check &amp; Notify If Bad</button>
+            <button id="btnSimulateBadWeather" class="px-4 py-2.5 rounded-xl bg-[#ff3b30] text-white text-xs font-medium hover:opacity-90 transition">Send Test Rain Alert</button>
+          </div>
+        </div>
+
+        <div class="apple-card p-6 lg:col-span-5 flex flex-col justify-between space-y-4">
+          <div>
+            <h3 class="text-base font-semibold text-[#1d1d1f] mb-1">Message Preview</h3>
+            <p class="text-xs text-[#86868b] mb-3">Sent when rain or thunder is detected</p>
+            <pre id="tgMessagePreview" class="p-4 rounded-2xl bg-[#1d1d1f] text-white/90 text-xs whitespace-pre-wrap font-mono leading-relaxed"></pre>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-[#1d1d1f] mb-2">Recent Alerts</h3>
+            <div id="alertLogFull" class="space-y-2 max-h-44 overflow-y-auto custom-scroll text-xs"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: DEPLOY -->
+    <div id="tab-deploy" class="tab-panel hidden space-y-5">
+      <div class="apple-card p-6 space-y-5">
+        <div>
+          <h2 class="text-lg font-semibold text-[#1d1d1f]">Launch Free on Netlify or Vercel</h2>
+          <p class="text-xs text-[#86868b] mt-0.5">Unzip <code class="text-[#1d1d1f]">indo-weather-shalat-deploy.zip</code> and deploy in under a minute.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="p-5 rounded-2xl bg-[#f5f5f7] space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-sm text-[#1d1d1f]">Netlify (Free)</span>
+              <span class="text-[11px] font-medium text-[#007AFF]">Drag &amp; Drop</span>
+            </div>
+            <ol class="text-xs text-[#636366] space-y-1.5 list-decimal list-inside">
+              <li>Drop the unzipped folder onto <a href="https://app.netlify.com/drop" target="_blank" rel="noopener noreferrer" class="text-[#007AFF] underline">app.netlify.com/drop</a>.</li>
+              <li>Set <code class="text-[#1d1d1f]">TELEGRAM_BOT_TOKEN</code> in Site Settings → Environment Variables.</li>
+              <li>Switch Delivery Mode in Telegram tab to <strong>Netlify Function</strong>.</li>
+            </ol>
+          </div>
+
+          <div class="p-5 rounded-2xl bg-[#f5f5f7] space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-sm text-[#1d1d1f]">Vercel (Free)</span>
+              <span class="text-[11px] font-medium text-[#007AFF]">Git Import</span>
+            </div>
+            <ol class="text-xs text-[#636366] space-y-1.5 list-decimal list-inside">
+              <li>Import the folder at <a href="https://vercel.com/new" target="_blank" rel="noopener noreferrer" class="text-[#007AFF] underline">vercel.com/new</a>.</li>
+              <li>Add <code class="text-[#1d1d1f]">TELEGRAM_BOT_TOKEN</code> to Environment Variables.</li>
+              <li>Switch Delivery Mode in Telegram tab to <strong>Vercel Serverless</strong>.</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    const PRESET_LOCATIONS = [
+      { id: 'bandung-coblong', name: 'Coblong, Kota Bandung', province: 'Jawa Barat', lat: -6.8879, lon: 107.6152 },
+      { id: 'jakarta-kemayoran', name: 'Kemayoran, Jakarta Pusat', province: 'DKI Jakarta', lat: -6.1614, lon: 106.8542 },
+      { id: 'surabaya-gubeng', name: 'Gubeng, Kota Surabaya', province: 'Jawa Timur', lat: -7.2756, lon: 112.7521 },
+      { id: 'yogya-gondokusuman', name: 'Gondokusuman, Yogyakarta', province: 'DI Yogyakarta', lat: -7.7833, lon: 110.3811 },
+      { id: 'medan-baru', name: 'Medan Baru, Kota Medan', province: 'Sumatera Utara', lat: 3.5752, lon: 98.6593 },
+      { id: 'makassar-panakkukang', name: 'Panakkukang, Makassar', province: 'Sulawesi Selatan', lat: -5.1477, lon: 119.4422 },
+      { id: 'denpasar-selatan', name: 'Denpasar Selatan, Bali', province: 'Bali', lat: -8.6989, lon: 115.2239 },
+      { id: 'balikpapan-kota', name: 'Balikpapan Kota, Kaltim', province: 'Kalimantan Timur', lat: -1.2675, lon: 116.8289 }
+    ];
+
+    const WMO_MAP = {
+      0:  { label: 'Clear', idLabel: 'Cerah', icon: 'sun', bad: false },
+      1:  { label: 'Mostly Clear', idLabel: 'Cerah Berawan', icon: 'cloud-sun', bad: false },
+      2:  { label: 'Partly Cloudy', idLabel: 'Berawan Sebagian', icon: 'cloud-sun', bad: false },
+      3:  { label: 'Cloudy', idLabel: 'Berawan', icon: 'cloud', bad: false },
+      45: { label: 'Foggy', idLabel: 'Berkabut', icon: 'cloud-fog', bad: false },
+      48: { label: 'Foggy', idLabel: 'Kabut Tebal', icon: 'cloud-fog', bad: false },
+      51: { label: 'Drizzle', idLabel: 'Gerimis', icon: 'cloud-drizzle', bad: true },
+      53: { label: 'Drizzle', idLabel: 'Gerimis Sedang', icon: 'cloud-drizzle', bad: true },
+      55: { label: 'Heavy Drizzle', idLabel: 'Gerimis Lebat', icon: 'cloud-drizzle', bad: true },
+      61: { label: 'Light Rain', idLabel: 'Hujan Ringan', icon: 'cloud-rain', bad: true },
+      63: { label: 'Moderate Rain', idLabel: 'Hujan Sedang', icon: 'cloud-rain', bad: true },
+      65: { label: 'Heavy Rain', idLabel: 'Hujan Lebat', icon: 'cloud-rain-wind', bad: true },
+      80: { label: 'Showers', idLabel: 'Hujan Lokal', icon: 'cloud-rain', bad: true },
+      81: { label: 'Heavy Showers', idLabel: 'Hujan Deras', icon: 'cloud-rain-wind', bad: true },
+      82: { label: 'Violent Showers', idLabel: 'Hujan Ekstrem', icon: 'cloud-rain-wind', bad: true },
+      95: { label: 'Thunderstorm', idLabel: 'Hujan Petir', icon: 'cloud-lightning', bad: true },
+      96: { label: 'Thunderstorm', idLabel: 'Badai Petir', icon: 'cloud-lightning', bad: true },
+      99: { label: 'Severe Storm', idLabel: 'Badai Petir Ekstrem', icon: 'cloud-lightning', bad: true }
+    };
+
+    const state = {
+      activeTab: 'overview',
+      location: { ...PRESET_LOCATIONS[0] },
+      watchlist: [],
+      weather: null,
+      shalat: null,
+      alertLog: [],
+      lastNotifiedByLoc: {},
+      autoTimerId: null,
+      countdownTimerId: null,
+      chartInstance: null
+    };
+
+    function loadStorage(key, fallback) {
+      try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch (e) { return fallback; }
+    }
+    function saveStorage(key, val) {
+      try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+    }
+
+    function showToast(msg, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const el = document.createElement('div');
+      const colors = {
+        info: 'bg-[#1d1d1f] text-white',
+        success: 'bg-[#34c759] text-white',
+        warn: 'bg-[#ff9500] text-white',
+        error: 'bg-[#ff3b30] text-white'
+      };
+      el.className = `pointer-events-auto px-4 py-2.5 rounded-2xl shadow-lg text-xs font-medium transition-all duration-300 ${colors[type] || colors.info}`;
+      el.textContent = msg;
+      container.appendChild(el);
+      setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 3400);
+    }
+
+    function getWmo(code) {
+      return WMO_MAP[code] || { label: `Code ${code}`, idLabel: 'Berawan', icon: 'cloud', bad: code >= 51 };
+    }
+
+    function switchTab(tabName) {
+      state.activeTab = tabName;
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+      const activePanel = document.getElementById(`tab-${tabName}`);
+      if (activePanel) activePanel.classList.remove('hidden');
+      document.querySelectorAll('[data-tab]').forEach(btn => {
+        if (btn.dataset.tab === tabName) btn.classList.add('active');
+        else btn.classList.remove('active');
+      });
+      if (tabName === 'overview' && state.weather) renderChart();
+    }
+
+    async function loadProvinces() {
+      const sel = document.getElementById('selectProvince');
+      try {
+        const res = await fetch('https://emsifa.github.io/api-wilayah-indonesia/api/provinces.json');
+        if (!res.ok) throw new Error('Offline');
+        const data = await res.json();
+        sel.innerHTML = '<option value="">Choose Province...</option>' +
+          data.map(p => `<option value="${p.id}" data-name="${p.name}">${p.name}</option>`).join('');
+      } catch (e) {
+        sel.innerHTML = '<option value="">Regions offline (use Search)</option>';
+      }
+    }
+
+    async function loadRegencies(provId) {
+      const regSel = document.getElementById('selectRegency');
+      const distSel = document.getElementById('selectDistrict');
+      const applyBtn = document.getElementById('btnApplyWilayah');
+      distSel.innerHTML = '<option value="">Select city first</option>';
+      distSel.disabled = true;
+      applyBtn.disabled = true;
+      if (!provId) { regSel.innerHTML = '<option value="">Select province first</option>'; regSel.disabled = true; return; }
+      regSel.innerHTML = '<option value="">Loading...</option>';
+      try {
+        const res = await fetch(`https://emsifa.github.io/api-wilayah-indonesia/api/regencies/${provId}.json`);
+        const data = await res.json();
+        regSel.disabled = false;
+        regSel.innerHTML = '<option value="">Choose City/Regency...</option>' +
+          data.map(r => `<option value="${r.id}" data-name="${r.name}">${r.name}</option>`).join('');
+      } catch (e) { regSel.innerHTML = '<option value="">Failed to load</option>'; }
+    }
+
+    async function loadDistricts(regId) {
+      const distSel = document.getElementById('selectDistrict');
+      const applyBtn = document.getElementById('btnApplyWilayah');
+      applyBtn.disabled = true;
+      if (!regId) { distSel.innerHTML = '<option value="">Select city first</option>'; distSel.disabled = true; return; }
+      distSel.innerHTML = '<option value="">Loading...</option>';
+      try {
+        const res = await fetch(`https://emsifa.github.io/api-wilayah-indonesia/api/districts/${regId}.json`);
+        const data = await res.json();
+        distSel.disabled = false;
+        distSel.innerHTML = '<option value="">Choose Subdistrict...</option>' +
+          data.map(d => `<option value="${d.id}" data-name="${d.name}">${d.name}</option>`).join('');
+      } catch (e) { distSel.innerHTML = '<option value="">Failed to load</option>'; }
+    }
+
+    async function geocodeIndonesianPlace(query) {
+      const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=8&language=en&countryCode=ID`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Geocoding failed');
+      const data = await res.json();
+      return data.results || [];
+    }
+
+    function toTitleCase(str) {
+      return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    async function applyCascadingWilayah() {
+      const provSel = document.getElementById('selectProvince');
+      const regSel = document.getElementById('selectRegency');
+      const distSel = document.getElementById('selectDistrict');
+      const provName = provSel.options[provSel.selectedIndex]?.dataset?.name || '';
+      const regName = regSel.options[regSel.selectedIndex]?.dataset?.name || '';
+      const distName = distSel.options[distSel.selectedIndex]?.dataset?.name || '';
+      if (!distName) return;
+
+      const btn = document.getElementById('btnApplyWilayah');
+      btn.disabled = true;
+      btn.querySelector('span').textContent = 'Locating...';
+      try {
+        const cleanReg = regName.replace(/^(KABUPATEN|KOTA)\s+/i, '');
+        let results = await geocodeIndonesianPlace(`${distName} ${cleanReg}`);
+        if (!results.length) results = await geocodeIndonesianPlace(distName);
+        if (!results.length) results = await geocodeIndonesianPlace(cleanReg);
+        if (results.length) {
+          const hit = results[0];
+          await selectLocation({
+            id: `wilayah-${distSel.value}`,
+            name: `${toTitleCase(distName)}, ${toTitleCase(regName)}`,
+            province: toTitleCase(provName),
+            lat: hit.latitude,
+            lon: hit.longitude
+          });
+          document.getElementById('wilayahDrawer').classList.add('hidden');
+        } else {
+          showToast(`Coordinates not found for ${distName}.`, 'warn');
+        }
+      } catch (e) {
+        showToast('Could not locate subdistrict.', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.querySelector('span').textContent = 'Load Subdistrict';
+      }
+    }
+
+    async function handleCitySearch() {
+      const q = document.getElementById('searchCityInput').value.trim();
+      const dd = document.getElementById('searchResultsDropdown');
+      if (!q) { dd.classList.add('hidden'); return; }
+      dd.innerHTML = '<div class="p-3 text-xs text-[#86868b]">Searching Indonesia...</div>';
+      dd.classList.remove('hidden');
+      try {
+        const results = await geocodeIndonesianPlace(q);
+        if (!results.length) { dd.innerHTML = '<div class="p-3 text-xs text-[#86868b]">No match found.</div>'; return; }
+        dd.innerHTML = '';
+        results.forEach(item => {
+          const btn = document.createElement('button');
+          btn.className = 'w-full text-left px-3 py-2 rounded-xl hover:bg-[#f2f2f7] transition flex items-center justify-between gap-2';
+          const sub = [item.admin2, item.admin1].filter(Boolean).join(', ');
+          btn.innerHTML = `
+            <div>
+              <div class="text-sm font-medium text-[#1d1d1f]">${item.name}</div>
+              <div class="text-xs text-[#86868b]">${sub || 'Indonesia'}</div>
+            </div>
+            <span class="text-[11px] font-mono text-[#86868b]">${item.latitude.toFixed(2)}, ${item.longitude.toFixed(2)}</span>
+          `;
+          btn.addEventListener('click', () => {
+            dd.classList.add('hidden');
+            selectLocation({
+              id: `geo-${item.id}`,
+              name: item.admin2 ? `${item.name}, ${item.admin2}` : item.name,
+              province: item.admin1 || 'Indonesia',
+              lat: item.latitude,
+              lon: item.longitude
+            });
+          });
+          dd.appendChild(btn);
+        });
+      } catch (e) {
+        dd.innerHTML = '<div class="p-3 text-xs text-[#ff3b30]">Search error.</div>';
+      }
+    }
+
+    async function fetchWeather(lat, lon) {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,rain,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,precipitation,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FJakarta`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Weather API failed');
+      return await res.json();
+    }
+
+    async function fetchShalatTimes(lat, lon, dateObj) {
+      const dd = String(dateObj.getDate()).padStart(2, '0');
+      const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const yyyy = dateObj.getFullYear();
+      const url = `https://api.aladhan.com/v1/timings/${dd}-${mm}-${yyyy}?latitude=${lat}&longitude=${lon}&method=20`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Shalat API failed');
+      const json = await res.json();
+      return json.data;
+    }
+
+    async function selectLocation(loc) {
+      state.location = loc;
+      document.getElementById('activeLocationTitle').textContent = loc.name;
+      document.getElementById('activeLocationSubtitle').innerHTML = `${loc.province} • <span id="activeCoordsBadge">${loc.lat.toFixed(4)}, ${loc.lon.toFixed(4)}</span>`;
+      document.getElementById('chartLocationLabel').textContent = loc.name;
+      await refreshActiveData();
+    }
+
+    async function refreshActiveData() {
+      const { lat, lon } = state.location;
+      const datePicker = document.getElementById('shalatDatePicker');
+      const selectedDate = datePicker.value ? new Date(datePicker.value + 'T12:00:00') : new Date();
+      try {
+        const [weatherData, shalatData] = await Promise.all([
+          fetchWeather(lat, lon),
+          fetchShalatTimes(lat, lon, selectedDate)
+        ]);
+        state.weather = weatherData;
+        state.shalat = shalatData;
+        renderWeatherUI();
+        renderShalatUI();
+        updateTelegramPreview();
+      } catch (err) {
+        const now = new Date();
+        const times = Array.from({ length: 24 }, (_, i) => new Date(now.getTime() + i * 3600000).toISOString().slice(0, 13) + ':00');
+        const days = Array.from({ length: 7 }, (_, i) => new Date(now.getTime() + i * 86400000).toISOString().slice(0, 10));
+        state.weather = {
+          current: { temperature_2m: 24.5, apparent_temperature: 26.2, relative_humidity_2m: 84, precipitation: 1.2, weather_code: 61, wind_speed_10m: 11.4 },
+          hourly: {
+            time: times,
+            temperature_2m: times.map((_, i) => 22 + Math.round(5 * Math.sin((i + 4) / 3.8))),
+            precipitation_probability: times.map((_, i) => (i >= 2 && i <= 7) ? 75 : 30),
+            precipitation: times.map((_, i) => (i >= 2 && i <= 7) ? 2.4 : 0.0),
+            weather_code: times.map((_, i) => (i >= 2 && i <= 7) ? 63 : 2)
+          },
+          daily: {
+            time: days,
+            weather_code: [61, 95, 3, 63, 2, 80, 1],
+            temperature_2m_max: [27, 26, 28, 27, 29, 27, 28],
+            temperature_2m_min: [19, 19, 20, 19, 20, 19, 19],
+            precipitation_probability_max: [75, 85, 25, 70, 20, 65, 15]
+          }
+        };
+        state.shalat = {
+          date: { readable: now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }), hijri: { day: '10', month: { en: 'Jumada al-Akhirah' }, year: '1448' } },
+          timings: { Imsak: '04:01', Fajr: '04:11', Sunrise: '05:27', Dhuhr: '11:42', Asr: '15:04', Maghrib: '17:52', Isha: '19:05' }
+        };
+        renderWeatherUI();
+        renderShalatUI();
+        updateTelegramPreview();
+      }
+    }
+
+    function analyzeWeatherRisk(weather) {
+      const cur = weather.current;
+      const curWmo = getWmo(cur.weather_code);
+      const next6Probs = weather.hourly.precipitation_probability.slice(0, 6);
+      const next6Codes = weather.hourly.weather_code.slice(0, 6);
+      const next6Precip = weather.hourly.precipitation.slice(0, 6);
+      const maxProb = Math.max(...next6Probs, 0);
+      const maxPrecip = Math.max(...next6Precip, cur.precipitation || 0);
+      const badCodeIn6h = next6Codes.find(c => getWmo(c).bad);
+      const activeBadCode = curWmo.bad ? cur.weather_code : badCodeIn6h;
+      const isBad = Boolean(activeBadCode !== undefined || maxProb >= 65);
+      return { isBad, maxProb, maxPrecip, triggerWmo: activeBadCode !== undefined ? getWmo(activeBadCode) : curWmo, curWmo };
+    }
+
+    function renderWeatherUI() {
+      const w = state.weather;
+      if (!w) return;
+      const cur = w.current;
+      const risk = analyzeWeatherRisk(w);
+
+      document.getElementById('kpiTemp').textContent = `${Math.round(cur.temperature_2m)}°`;
+      document.getElementById('kpiFeels').textContent = `Feels ${Math.round(cur.apparent_temperature)}°`;
+      document.getElementById('kpiConditionText').textContent = risk.curWmo.label;
+      document.getElementById('kpiHumidityWind').textContent = `${cur.relative_humidity_2m}% • ${Math.round(cur.wind_speed_10m)} km/h`;
+      document.getElementById('kpiRainProb').textContent = `${risk.maxProb}%`;
+      document.getElementById('kpiRainMm').textContent = `${risk.maxPrecip.toFixed(1)} mm`;
+
+      const pill = document.getElementById('weatherAlertPill');
+      const riskLabel = document.getElementById('kpiRiskLabel');
+      const headerBadge = document.getElementById('headerAlertBadge');
+
+      if (risk.isBad) {
+        pill.className = 'text-xs font-medium px-2.5 py-0.5 rounded-full bg-rose-50 text-[#ff3b30]';
+        pill.textContent = risk.triggerWmo.label;
+        riskLabel.className = 'font-medium text-[#ff3b30]';
+        riskLabel.textContent = `Prepare: ${risk.triggerWmo.idLabel}`;
+        headerBadge.classList.remove('hidden');
+      } else {
+        pill.className = 'text-xs font-medium px-2.5 py-0.5 rounded-full bg-emerald-50 text-[#34c759]';
+        pill.textContent = 'Clear';
+        riskLabel.className = 'font-medium text-[#34c759]';
+        riskLabel.textContent = 'Safe';
+        headerBadge.classList.add('hidden');
+      }
+
+      const dailyGrid = document.getElementById('dailyForecastGrid');
+      dailyGrid.innerHTML = '';
+      w.daily.time.forEach((dateStr, idx) => {
+        const wmo = getWmo(w.daily.weather_code[idx]);
+        const d = new Date(dateStr + 'T12:00:00');
+        const dayName = idx === 0 ? 'Today' : d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
+        const card = document.createElement('div');
+        card.className = `p-3.5 rounded-2xl ${wmo.bad ? 'bg-rose-50/60' : 'bg-[#f5f5f7]'} flex flex-col justify-between gap-2`;
+        card.innerHTML = `
+          <div class="text-xs font-medium text-[#86868b]">${dayName}</div>
+          <div class="flex items-center gap-2 my-1">
+            <i data-lucide="${wmo.icon}" class="w-5 h-5 ${wmo.bad ? 'text-[#ff3b30]' : 'text-[#007AFF]'}"></i>
+            <span class="text-xs font-medium text-[#1d1d1f]">${wmo.label}</span>
+          </div>
+          <div class="flex items-center justify-between text-xs pt-2 border-t border-black/5">
+            <span class="font-semibold text-[#1d1d1f]">${Math.round(w.daily.temperature_2m_max[idx])}° / ${Math.round(w.daily.temperature_2m_min[idx])}°</span>
+            <span class="${w.daily.precipitation_probability_max[idx] >= 60 ? 'text-[#ff3b30] font-medium' : 'text-[#86868b]'}">${w.daily.precipitation_probability_max[idx]}%</span>
+          </div>
+        `;
+        dailyGrid.appendChild(card);
+      });
+
+      const tbody = document.getElementById('hourlyTableBody');
+      tbody.innerHTML = '';
+      for (let i = 0; i < 24; i += 3) {
+        const tStr = w.hourly.time[i];
+        const hourLabel = tStr ? tStr.slice(11, 16) : `${String(i).padStart(2, '0')}:00`;
+        const wmo = getWmo(w.hourly.weather_code[i]);
+        const prob = w.hourly.precipitation_probability[i];
+        const precip = w.hourly.precipitation[i];
+        const isWarn = wmo.bad || prob >= 65;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="py-2.5 pr-4 font-mono text-xs font-medium text-[#1d1d1f]">${hourLabel}</td>
+          <td class="py-2.5 pr-4 flex items-center gap-2"><i data-lucide="${wmo.icon}" class="w-4 h-4 ${isWarn ? 'text-[#ff3b30]' : 'text-[#007AFF]'}"></i><span>${wmo.label}</span></td>
+          <td class="py-2.5 pr-4 font-medium">${Math.round(w.hourly.temperature_2m[i])}°</td>
+          <td class="py-2.5 pr-4 text-[#86868b]">${prob}%</td>
+          <td class="py-2.5 pr-4 text-[#86868b]">${precip.toFixed(1)} mm</td>
+          <td class="py-2.5"><span class="px-2 py-0.5 rounded-full text-[11px] font-medium ${isWarn ? 'bg-rose-50 text-[#ff3b30]' : 'bg-emerald-50 text-[#34c759]'}">${isWarn ? 'Rain Alert' : 'Fair'}</span></td>
+        `;
+        tbody.appendChild(tr);
+      }
+
+      renderChart();
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function renderChart() {
+      const canvas = document.getElementById('weatherChart');
+      if (!canvas || !state.weather) return;
+      const w = state.weather;
+      const labels = w.hourly.time.slice(0, 24).map(t => t.slice(11, 16));
+      const temps = w.hourly.temperature_2m.slice(0, 24);
+      const probs = w.hourly.precipitation_probability.slice(0, 24);
+
+      if (state.chartInstance) state.chartInstance.destroy();
+      state.chartInstance = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Temp (°C)',
+              data: temps,
+              borderColor: '#1d1d1f',
+              backgroundColor: 'rgba(29, 29, 31, 0.05)',
+              borderWidth: 2,
+              pointRadius: 2,
+              tension: 0.4,
+              fill: true,
+              yAxisID: 'y'
+            },
+            {
+              label: 'Rain (%)',
+              data: probs,
+              borderColor: '#007AFF',
+              backgroundColor: 'rgba(0, 122, 255, 0.08)',
+              borderWidth: 2,
+              pointRadius: 2,
+              tension: 0.4,
+              fill: true,
+              yAxisID: 'y1'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { position: 'top', align: 'end', labels: { boxWidth: 8, usePointStyle: true, font: { size: 11 } } }
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { maxTicksLimit: 8, font: { size: 11 }, color: '#86868b' } },
+            y: { position: 'left', grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 11 }, color: '#86868b' } },
+            y1: { position: 'right', min: 0, max: 100, grid: { display: false }, ticks: { font: { size: 11 }, color: '#86868b' } }
+          }
+        }
+      });
+    }
+
+    function renderShalatUI() {
+      const s = state.shalat;
+      if (!s) return;
+      const t = s.timings;
+      const hijri = `${s.date.hijri.day} ${s.date.hijri.month.en} ${s.date.hijri.year} H`;
+      document.getElementById('kpiHijriDate').textContent = hijri;
+      document.getElementById('shalatDateLabel').textContent = `${s.date.readable} • ${hijri}`;
+
+      const prayers = [
+        { key: 'Imsak', label: 'Imsak', time: t.Imsak },
+        { key: 'Fajr', label: 'Subuh', time: t.Fajr },
+        { key: 'Sunrise', label: 'Terbit', time: t.Sunrise },
+        { key: 'Dhuhr', label: 'Dzuhur', time: t.Dhuhr },
+        { key: 'Asr', label: 'Ashar', time: t.Asr },
+        { key: 'Maghrib', label: 'Maghrib', time: t.Maghrib },
+        { key: 'Isha', label: 'Isya', time: t.Isha }
+      ];
+
+      const overviewGrid = document.getElementById('overviewShalatGrid');
+      const fullGrid = document.getElementById('fullShalatGrid');
+      overviewGrid.innerHTML = '';
+      fullGrid.innerHTML = '';
+
+      const nextP = findNextPrayer(prayers);
+      document.getElementById('kpiNextPrayerName').textContent = nextP.label;
+      document.getElementById('kpiNextPrayerTime').textContent = nextP.time;
+
+      prayers.forEach(p => {
+        const isNext = p.key === nextP.key;
+        const row = document.createElement('div');
+        row.className = `py-2.5 px-2 flex items-center justify-between ${isNext ? 'bg-[#f5f5f7] rounded-xl font-semibold' : ''}`;
+        row.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="w-1.5 h-1.5 rounded-full ${isNext ? 'bg-[#007AFF]' : 'bg-transparent'}"></span>
+            <span class="text-sm text-[#1d1d1f]">${p.label}</span>
+          </div>
+          <span class="text-sm font-mono ${isNext ? 'text-[#007AFF] font-semibold' : 'text-[#86868b]'}">${p.time}</span>
+        `;
+        overviewGrid.appendChild(row);
+
+        const cardFull = document.createElement('div');
+        cardFull.className = `p-4 rounded-2xl ${isNext ? 'bg-[#1d1d1f] text-white' : 'bg-[#f5f5f7] text-[#1d1d1f]'}`;
+        cardFull.innerHTML = `
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-xs font-medium ${isNext ? 'text-white/60' : 'text-[#86868b]'}">${p.label}</span>
+            ${isNext ? '<span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#007AFF] text-white">Next</span>' : ''}
+          </div>
+          <div class="text-2xl font-mono font-semibold">${p.time}</div>
+        `;
+        fullGrid.appendChild(cardFull);
+      });
+
+      startCountdown(prayers);
+    }
+
+    function findNextPrayer(prayers) {
+      const now = new Date();
+      const nowMins = now.getHours() * 60 + now.getMinutes();
+      for (const p of prayers) {
+        if (p.key === 'Imsak' || p.key === 'Sunrise') continue;
+        const [hh, mm] = p.time.split(':').map(Number);
+        if (hh * 60 + mm > nowMins) return { ...p, tomorrow: false };
+      }
+      const subuh = prayers.find(p => p.key === 'Fajr') || prayers[0];
+      return { ...subuh, tomorrow: true };
+    }
+
+    function startCountdown(prayers) {
+      if (state.countdownTimerId) clearInterval(state.countdownTimerId);
+      const update = () => {
+        const nextP = findNextPrayer(prayers);
+        const now = new Date();
+        const [hh, mm] = nextP.time.split(':').map(Number);
+        const target = new Date(now);
+        target.setHours(hh, mm, 0, 0);
+        if (nextP.tomorrow) target.setDate(target.getDate() + 1);
+        const diff = Math.max(0, Math.floor((target - now) / 1000));
+        const h = String(Math.floor(diff / 3600)).padStart(2, '0');
+        const m = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
+        const s = String(diff % 60).padStart(2, '0');
+        document.getElementById('kpiCountdown').textContent = `in ${h}:${m}:${s}`;
+      };
+      update();
+      state.countdownTimerId = setInterval(update, 1000);
+    }
+
+    function renderWatchlist() {
+      const container = document.getElementById('watchlistContainer');
+      container.innerHTML = '';
+      if (!state.watchlist.length) {
+        container.innerHTML = '<div class="col-span-full text-xs text-[#86868b] p-3 rounded-xl bg-[#f5f5f7]">No saved locations yet. Tap the bookmark icon above to save one.</div>';
+        return;
+      }
+      state.watchlist.forEach(loc => {
+        const isCurrent = loc.id === state.location.id;
+        const card = document.createElement('div');
+        card.className = `p-3 rounded-2xl flex items-center justify-between gap-2 transition cursor-pointer ${isCurrent ? 'bg-[#1d1d1f] text-white' : 'bg-[#f5f5f7] hover:bg-[#ececef] text-[#1d1d1f]'}`;
+        card.innerHTML = `
+          <div class="min-w-0">
+            <div class="text-sm font-medium truncate">${loc.name}</div>
+            <div class="text-[11px] ${isCurrent ? 'text-white/60' : 'text-[#86868b]'}">${loc.province}</div>
+          </div>
+          <button data-remove-loc="${loc.id}" title="Remove" class="p-1 rounded-full ${isCurrent ? 'hover:bg-white/10 text-white/60' : 'hover:bg-black/5 text-[#86868b]'}">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+          </button>
+        `;
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('[data-remove-loc]')) {
+            e.stopPropagation();
+            state.watchlist = state.watchlist.filter(x => x.id !== loc.id);
+            saveStorage('np_watchlist', state.watchlist);
+            renderWatchlist();
+            return;
+          }
+          selectLocation(loc);
+        });
+        container.appendChild(card);
+      });
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function buildTelegramMessage(loc, weather, shalat, isTest = false) {
+      const cur = weather ? weather.current : { temperature_2m: 26, relative_humidity_2m: 82 };
+      const risk = weather ? analyzeWeatherRisk(weather) : { triggerWmo: { label: 'Thunderstorm', idLabel: 'Hujan Petir' }, maxProb: 85, maxPrecip: 6.4 };
+      const nextP = shalat ? findNextPrayer([
+        { key: 'Fajr', label: 'Subuh', time: shalat.timings.Fajr },
+        { key: 'Dhuhr', label: 'Dzuhur', time: shalat.timings.Dhuhr },
+        { key: 'Asr', label: 'Ashar', time: shalat.timings.Asr },
+        { key: 'Maghrib', label: 'Maghrib', time: shalat.timings.Maghrib },
+        { key: 'Isha', label: 'Isya', time: shalat.timings.Isha }
+      ]) : { label: 'Ashar', time: '15:15' };
+
+      const header = isTest ? '🧪 [TEST] WEATHER ALERT — PREPARE FOR RAIN' : '⛈️ WEATHER ALERT — PREPARE FOR BAD WEATHER';
+      return `${header}\n\n` +
+        `📍 Location: ${loc.name} (${loc.province})\n` +
+        `🌧️ Condition: ${risk.triggerWmo.label} (${risk.triggerWmo.idLabel})\n` +
+        `🌡️ Temp: ${Math.round(cur.temperature_2m)}°C | Rain Chance: ${risk.maxProb}%\n` +
+        `🕌 Next Shalat: ${nextP.label} at ${nextP.time} WIB\n\n` +
+        `⚠️ Reminder: Rain/thunderstorm is expected. Bring an umbrella/raincoat and stay safe!`;
+    }
+
+    function updateTelegramPreview() {
+      const previewEl = document.getElementById('tgMessagePreview');
+      if (previewEl) previewEl.textContent = buildTelegramMessage(state.location, state.weather, state.shalat, false);
+    }
+
+    function addAlertLog(entry) {
+      state.alertLog.unshift({ ...entry, time: new Date().toLocaleTimeString('en-GB', { hour12: false }) });
+      state.alertLog = state.alertLog.slice(0, 20);
+      saveStorage('np_alert_log', state.alertLog);
+      renderAlertLogs();
+    }
+
+    function renderAlertLogs() {
+      const targets = [document.getElementById('alertLogOverview'), document.getElementById('alertLogFull')];
+      targets.forEach(el => {
+        if (!el) return;
+        if (!state.alertLog.length) {
+          el.innerHTML = '<div class="text-[#86868b] p-3 rounded-xl bg-[#f5f5f7]">No Telegram alerts sent yet.</div>';
+          return;
+        }
+        el.innerHTML = state.alertLog.map(item => `
+          <div class="p-2.5 rounded-xl bg-[#f5f5f7] flex items-start justify-between gap-2">
+            <div>
+              <div class="font-medium text-[#1d1d1f]">${item.location}</div>
+              <div class="${item.ok ? 'text-[#34c759]' : 'text-[#ff3b30]'}">${item.summary}</div>
+            </div>
+            <span class="font-mono text-[10px] text-[#86868b] shrink-0">${item.time}</span>
+          </div>
+        `).join('');
+      });
+    }
+
+    async function detectTelegramChatId() {
+      const token = document.getElementById('tgBotToken').value.trim();
+      if (!token) { showToast('Enter Bot Token first.', 'warn'); return; }
+      showToast('Checking @fdicallbot updates...', 'info');
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates`);
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.description || 'Telegram API error');
+        const updates = data.result || [];
+        const lastWithMsg = [...updates].reverse().find(u => u.message?.chat?.id || u.my_chat_member?.chat?.id);
+        if (!lastWithMsg) { showToast('Send /start to @fdicallbot in Telegram first!', 'warn'); return; }
+        const chat = lastWithMsg.message?.chat || lastWithMsg.my_chat_member?.chat;
+        document.getElementById('tgChatId').value = String(chat.id);
+        saveStorage('np_tg_chat_id', String(chat.id));
+        updateChatIdBadge();
+        showToast(`Connected Chat ID: ${chat.id}`, 'success');
+      } catch (err) {
+        showToast(`Detect failed: ${err.message}`, 'error');
+      }
+    }
+
+    function updateChatIdBadge() {
+      const chatId = document.getElementById('tgChatId').value.trim();
+      const badge = document.getElementById('kpiChatIdState');
+      if (chatId) {
+        badge.className = 'font-medium text-[#34c759]';
+        badge.textContent = `Connected (${chatId})`;
+      } else {
+        badge.className = 'font-medium text-[#ff9500]';
+        badge.textContent = 'Setup needed';
+      }
+    }
+
+    async function sendTelegramMessage(text, locName) {
+      const token = document.getElementById('tgBotToken').value.trim();
+      const chatId = document.getElementById('tgChatId').value.trim();
+      const mode = document.getElementById('tgDeliveryMode').value;
+      if (!chatId) { showToast('Set or Auto-Detect Chat ID first.', 'warn'); switchTab('telegram'); return false; }
+      try {
+        let res, data;
+        if (mode === 'direct') {
+          res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, text })
+          });
+          data = await res.json();
+          if (!data.ok) throw new Error(data.description || 'Telegram sendMessage failed');
+        } else {
+          const endpoint = mode === 'netlify' ? '/.netlify/functions/telegram-notify' : '/api/telegram-notify';
+          res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, text })
+          });
+          data = await res.json();
+          if (!res.ok || !data.ok) throw new Error(data.error || 'Serverless function failed');
+        }
+        addAlertLog({ ok: true, location: locName, summary: 'Alert delivered' });
+        showToast(`Alert sent for ${locName}!`, 'success');
+        return true;
+      } catch (err) {
+        addAlertLog({ ok: false, location: locName, summary: err.message });
+        showToast(`Telegram error: ${err.message}`, 'error');
+        return false;
+      }
+    }
+
+    async function checkAndNotifyCurrent(forceTest = false) {
+      if (!state.weather) { showToast('Weather data loading.', 'warn'); return; }
+      const risk = analyzeWeatherRisk(state.weather);
+      if (forceTest || risk.isBad) {
+        await sendTelegramMessage(buildTelegramMessage(state.location, state.weather, state.shalat, forceTest), state.location.name);
+      } else {
+        showToast(`Weather in ${state.location.name} is fair (${risk.curWmo.label}).`, 'info');
+      }
+    }
+
+    async function scanAllWatchlistAndNotify() {
+      if (!state.watchlist.length) { showToast('Watchlist is empty.', 'warn'); return; }
+      showToast(`Scanning ${state.watchlist.length} location(s)...`, 'info');
+      let badCount = 0;
+      for (const loc of state.watchlist) {
+        try {
+          const w = await fetchWeather(loc.lat, loc.lon);
+          const risk = analyzeWeatherRisk(w);
+          if (risk.isBad) {
+            badCount++;
+            const lastTs = state.lastNotifiedByLoc[loc.id] || 0;
+            if (Date.now() - lastTs > 30 * 60 * 1000) {
+              const s = await fetchShalatTimes(loc.lat, loc.lon, new Date());
+              const sent = await sendTelegramMessage(buildTelegramMessage(loc, w, s, false), loc.name);
+              if (sent) state.lastNotifiedByLoc[loc.id] = Date.now();
+            }
+          }
+        } catch (e) {}
+      }
+      if (badCount === 0) showToast('All saved locations have fair weather.', 'success');
+    }
+
+    function init() {
+      state.watchlist = loadStorage('np_watchlist', [PRESET_LOCATIONS[0], PRESET_LOCATIONS[1]]);
+      state.alertLog = loadStorage('np_alert_log', []);
+      const savedChatId = loadStorage('np_tg_chat_id', '');
+      if (savedChatId) document.getElementById('tgChatId').value = savedChatId;
+      updateChatIdBadge();
+
+      document.getElementById('shalatDatePicker').value = new Date().toISOString().slice(0, 10);
+
+      const chipsWrap = document.getElementById('presetChips');
+      PRESET_LOCATIONS.forEach(loc => {
+        const btn = document.createElement('button');
+        btn.className = 'text-xs font-medium px-3 py-1.5 rounded-full bg-white border border-black/5 text-[#1d1d1f] hover:bg-[#1d1d1f] hover:text-white transition whitespace-nowrap';
+        btn.textContent = loc.name.split(',')[0];
+        btn.addEventListener('click', () => selectLocation(loc));
+        chipsWrap.appendChild(btn);
+      });
+
+      document.querySelectorAll('[data-tab]').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+      document.querySelectorAll('[data-jump]').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.jump)));
+      document.getElementById('btnToggleWilayah').addEventListener('click', () => {
+        document.getElementById('wilayahDrawer').classList.toggle('hidden');
+      });
+
+      document.getElementById('selectProvince').addEventListener('change', (e) => loadRegencies(e.target.value));
+      document.getElementById('selectRegency').addEventListener('change', (e) => loadDistricts(e.target.value));
+      document.getElementById('selectDistrict').addEventListener('change', (e) => {
+        document.getElementById('btnApplyWilayah').disabled = !e.target.value;
+      });
+      document.getElementById('btnApplyWilayah').addEventListener('click', applyCascadingWilayah);
+
+      document.getElementById('btnSearchCity').addEventListener('click', handleCitySearch);
+      document.getElementById('searchCityInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') handleCitySearch(); });
+      document.addEventListener('click', (e) => {
+        const dd = document.getElementById('searchResultsDropdown');
+        if (!e.target.closest('#searchCityInput') && !e.target.closest('#searchResultsDropdown') && !e.target.closest('#btnSearchCity')) {
+          dd.classList.add('hidden');
+        }
+      });
+
+      document.getElementById('btnRefreshAll').addEventListener('click', () => { showToast('Refreshing...', 'info'); refreshActiveData(); });
+      document.getElementById('btnQuickSaveLocation').addEventListener('click', () => {
+        if (!state.watchlist.some(x => x.id === state.location.id)) {
+          state.watchlist.push({ ...state.location });
+          saveStorage('np_watchlist', state.watchlist);
+          renderWatchlist();
+          showToast(`Saved ${state.location.name}`, 'success');
+        } else {
+          showToast('Already saved.', 'info');
+        }
+      });
+      document.getElementById('btnHeaderTestAlert').addEventListener('click', () => checkAndNotifyCurrent(true));
+      document.getElementById('btnOverviewTriggerAlert').addEventListener('click', () => checkAndNotifyCurrent(false));
+      document.getElementById('btnScanAllWatchlist').addEventListener('click', scanAllWatchlistAndNotify);
+      document.getElementById('btnClearLog').addEventListener('click', () => { state.alertLog = []; saveStorage('np_alert_log', []); renderAlertLogs(); });
+
+      document.getElementById('shalatDatePicker').addEventListener('change', refreshActiveData);
+      document.getElementById('btnShalatToday').addEventListener('click', () => {
+        document.getElementById('shalatDatePicker').value = new Date().toISOString().slice(0, 10);
+        refreshActiveData();
+      });
+
+      document.getElementById('btnToggleToken').addEventListener('click', () => {
+        const inp = document.getElementById('tgBotToken');
+        const btn = document.getElementById('btnToggleToken');
+        if (inp.type === 'password') { inp.type = 'text'; btn.textContent = 'Hide'; }
+        else { inp.type = 'password'; btn.textContent = 'Show'; }
+      });
+      document.getElementById('tgChatId').addEventListener('input', (e) => { saveStorage('np_tg_chat_id', e.target.value.trim()); updateChatIdBadge(); });
+      document.getElementById('btnDetectChatId').addEventListener('click', detectTelegramChatId);
+      document.getElementById('btnCheckAndNotify').addEventListener('click', () => checkAndNotifyCurrent(false));
+      document.getElementById('btnSimulateBadWeather').addEventListener('click', () => checkAndNotifyCurrent(true));
+      document.getElementById('tgAutoInterval').addEventListener('change', (e) => {
+        if (state.autoTimerId) clearInterval(state.autoTimerId);
+        const mins = Number(e.target.value);
+        if (mins > 0) {
+          state.autoTimerId = setInterval(scanAllWatchlistAndNotify, mins * 60 * 1000);
+          showToast(`Auto-monitor: every ${mins}m`, 'success');
+        } else {
+          showToast('Auto-monitor off.', 'info');
+        }
+      });
+
+      renderWatchlist();
+      renderAlertLogs();
+      loadProvinces();
+      selectLocation(state.location);
+      if (window.lucide) lucide.createIcons();
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
